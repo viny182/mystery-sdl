@@ -1,0 +1,6 @@
+mystery
+tools/out/
+*.dll
+*.scr
+*.o
+frame*.bmp

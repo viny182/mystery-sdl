@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mystery - mapa da cena</title>
+<style>
+:root{--bg:#111318;--fg:#e8e8ee;--mut:#9aa0ad;--card:#1a1d25;--acc:#ffd23f;--line:#2a2f3b}
+@media (prefers-color-scheme: light){:root{--bg:#f4f4f7;--fg:#1b1d22;--mut:#5b6170;--card:#fff;--acc:#b8860b;--line:#d7d9e0}}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,sans-serif}
+header{padding:14px 18px;border-bottom:1px solid var(--line)} h1{margin:0;font-size:18px} .sub{color:var(--mut);font-size:12px}
+main{display:flex;flex-wrap:wrap;gap:16px;padding:16px 18px}
+#stage{position:relative;overflow:hidden;width:640px;height:480px;flex:none;background:#000;image-rendering:pixelated;border:1px solid var(--line)}
+#stage img{position:absolute;left:0;top:0;width:640px;height:480px}
+.box{position:absolute;border:1px solid rgba(255,210,63,.8);box-sizing:border-box;cursor:pointer}
+.box:hover,.box.sel{background:rgba(255,210,63,.28);border-color:#fff}
+.box.static{border-color:rgba(90,200,255,.6)}
+#panel{flex:1;min-width:300px;max-width:760px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:12px}
+.card h2{margin:0 0 8px;font-size:15px} table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{border-bottom:1px solid var(--line);padding:3px 6px;text-align:left} th{color:var(--mut);font-weight:600}
+.strip{image-rendering:pixelated;max-width:100%;background:repeating-conic-gradient(#8884 0 25%,#0000 0 50%) 0 0/12px 12px}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px} .chip{background:var(--line);border-radius:10px;padding:1px 8px;font-size:12px}
+label{font-size:12px;color:var(--mut);margin-right:12px}
+</style></head><body>
+<header><h1>Mystery: mapa da cena (640x480)</h1>
+<div class="sub">Quadro de referência gerado pelo port. Clique numa caixa para ver sprite, passos de animação e ações. Nomes de campos são inferidos do código, não símbolos originais.</div></header>
+<main>
+<div>
+<div id="stage"><img id="frame" alt="quadro inicial"></div>
+<div style="margin-top:8px"><label><input type="checkbox" id="ck_a" checked> atores (amarelo)</label><label><input type="checkbox" id="ck_s" checked> estáticos (azul)</label></div>
+</div>
+<div id="panel"><div class="card"><h2>Nada selecionado</h2><div class="sub">Clique num retângulo sobre a cena.</div></div></div>
+</main>
+<script>
+const SCENE=__SCENE__, IMGS=__IMGS__; document.getElementById('frame').src='data:image/png;base64,__FRAME__';
+const sprites={}; SCENE.sprites.forEach(s=>sprites[s.id]=s);
+const stage=document.getElementById('stage'), panel=document.getElementById('panel'); let boxes=[];
+function add(e,kind){const b=document.createElement('div');b.className='box '+kind;
+ b.style.left=e.screen_x_640x480+'px';b.style.top=e.screen_y_640x480+'px';
+ b.style.width=Math.max(e.frame_w,4)+'px';b.style.height=Math.max(e.frame_h,4)+'px';
+ b.title=kind+' id '+e.id+' (sprite '+e.sprite+')';b.dataset.key=(kind==='actor'?'a':'s')+e.id;b.onclick=()=>show(e,kind,b);stage.appendChild(b);boxes.push([kind,b]);}
+SCENE.statics.filter(e=>!e.tiled).forEach(e=>add(e,'static'));
+SCENE.actors.filter(e=>!e.tiled).forEach(e=>add(e,'actor'));
+['ck_a','ck_s'].forEach(id=>document.getElementById(id).onchange=()=>{const a=ck_a.checked,s=ck_s.checked;boxes.forEach(([k,b])=>b.style.display=(k==='actor'?a:s)?'':'none')});
+function table(h,rows){return '<table><tr>'+h.map(x=>'<th>'+x+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+x+'</td>').join('')+'</tr>').join('')+'</table>';}
+function show(e,kind,el){boxes.forEach(([k,b])=>b.classList.remove('sel'));el.classList.add('sel');
+ const sd=sprites[e.sprite];let h='<div class="card"><h2>'+(kind==='actor'?'Ator':'Estático')+' id '+e.id+' — sprite '+e.sprite+'</h2><div class="row">'+
+ ['posição '+e.x+','+e.y,'âncora '+e.anchor,'tela 640x480: '+e.screen_x_640x480+','+e.screen_y_640x480,'quadro '+e.frame_w+'x'+e.frame_h,'frames '+sd.frames,
+  e.static_placement?'colocado direto':'','sequência '+(e.sequence??'-'),'flags 0x'+(e.flags>>>0).toString(16)].filter(Boolean).map(t=>'<span class="chip">'+t+'</span>').join('')+
+ '</div><img class="strip" src="data:image/png;base64,'+IMGS[sd.bitmap257]+'" alt="folha de sprites"></div>';
+ if(sd.paths.length)h+='<div class="card"><h2>Caminhos de animação</h2>'+sd.paths.map(p=>'<div class="sub">caminho '+p.id+' — '+p.interval_ms+' ms por passo</div>'+
+  table(['#','dx','dy','quadro','som'],p.steps.map((s,i)=>[i,s.dx,s.dy,s.frame===65535?'último':s.frame,s.sound||'-']))).join('')+'</div>';
+ if(e.actions&&e.actions.length)h+='<div class="card"><h2>Ações (sequência '+e.sequence+')</h2>'+table(['#','tipo','caminho','espera (min,max)','espera 2','fonte→alvo','máscara'],
+  e.actions.map(a=>[a.index,a.kind,a.path_index,a.range_d.join(','),a.range_b.join(','),a.src_actor+'→'+a.dst_actor,'0x'+a.mask.toString(16)]))+'</div>';
+ panel.innerHTML=h;}
+const m=location.hash.match(/^#([as]\d+)$/);if(m){const t=boxes.find(([k,b])=>b.dataset.key===m[1]);if(t)t[1].click();}
+</script></body></html>
